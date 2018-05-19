@@ -1,7 +1,7 @@
 'use strict';
-module.exports = function (app, id, vectorClock, otherServer) {
+module.exports = function (app, id, vectorClock, otherServer, socket) {
     let controller = require('../controllers/controller');
-    controller.setup(id, [id, otherServer]);
+    controller.setup(id, [3000 + id, otherServer], socket);
 
     //Different routes
     //This first route is to send an artificial post to a certain server.
@@ -13,11 +13,11 @@ module.exports = function (app, id, vectorClock, otherServer) {
     app.route('/ms/request')
         .post((res, req) => {return controller.request(res, req, id, vectorClock)});
     app.route('/ms/requestReturn')
-        .post((res, req) => {return controller.requestReturn(res, req, id, vectorClock)});
+        .post((res, req) => {return controller.requestReturn(res, req, id)});
     app.route('/ms/release')
         .post((res, req) => {return controller.release(res, req, id, vectorClock)});
     app.route('/client/release')
-        .post((res, req) => {return controller.clientRequest(res, req, id, vectorClock)});
-    app.route('/client/request')
         .post((res, req) => {return controller.clientRelease(res, req, id, vectorClock)});
+    app.route('/client/request')
+        .post((res, req) => {return controller.clientRequest(res, req, id, vectorClock)});
 };

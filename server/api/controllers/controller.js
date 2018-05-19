@@ -1,8 +1,6 @@
 'use strict';
 let querystring = require('querystring');
 let http = require('http');
-let express = require("express");
-let path = require("path");
 
 //Set this process id.
 let id = 0;
@@ -16,8 +14,8 @@ let voted = false;
 let repliesReceived = 0;
 //Queue of requests.
 let queue = [];
-
-
+//Socket object.
+let socket = null;
 
 //On update, send post to certain server (Manually triggered).
 exports.update = function (req, res, id, vectorClock) {
@@ -44,7 +42,9 @@ exports.clientRequest = function (req, res, id, vectorClock) {
     votingSet.forEach(function (port) {
         console.log("Sending request to: " + port);
         sendPost(port, "/ms/request", id, vectorClock);
+        notifyClientSide();
     });
+    res.end();
 };
 
 
@@ -61,7 +61,9 @@ exports.clientRelease = function (req, res, id, vectorClock) {
     votingSet.forEach(function (port) {
         console.log("Sending release message to: " + port);
         sendPost(port, "/ms/release", id, vectorClock);
+        notifyClientSide();
     });
+    res.end();
 };
 
 /**
@@ -69,9 +71,8 @@ exports.clientRelease = function (req, res, id, vectorClock) {
  * @param req the request.
  * @param res the response.
  * @param id the id of this server.
- * @param vectorClock the vector block of this server.
  */
-exports.requestReturn = function (req, res, id, vectorClock) {
+exports.requestReturn = function (req, res, id) {
     repliesReceived++;
     console.log(id + " received answer #" + repliesReceived + " of server regarding mutual exclusion!");
     if (repliesReceived >= votingSet.length) {
@@ -79,6 +80,8 @@ exports.requestReturn = function (req, res, id, vectorClock) {
         state = "HELD";
         console.log("Holding now!")
     }
+    notifyClientSide();
+    res.end();
 };
 
 /**
@@ -89,23 +92,26 @@ exports.requestReturn = function (req, res, id, vectorClock) {
  * @param vectorClock the vector block of this server.
  */
 exports.request = function (req, res, id, vectorClock) {
-    console.log(id + " received request of other server for mutual exclusion!");
     let i = req.body.id;
+    console.log(id + " received request of other server " + i + " for mutual exclusion! State: " + state + " voted: " + voted);
+
     if (state !== "HELD" && !voted) {
-        if (state === "RELEASED" || (state === "WANTED" && vectorClock[i] < vectorClock[id])) {
+        if (state === "RELEASED" || (state === "WANTED" && (vectorClock[i] < vectorClock[id] || (vectorClock[i] === vectorClock[id] && i < id) || parseInt(i) === parseInt(id)))) {
             console.log("Sending vote to " + i);
-            sendPost(i, "/ms/requestReturn", id, vectorClock);
+            sendPost(3000 + parseInt(i), "/ms/requestReturn", id, vectorClock);
             voted = true;
         }
         else {
-            console.log("Added " + i + " to queue");
             queue.push(i);
+            console.log("Added " + i + " to queue");
         }
     }
     else {
         queue.push(i);
-        console.log("Added " + i + " to queue");
+        console.log("Added " + i + " to queue is holding or voted already!");
     }
+    notifyClientSide();
+    res.end();
 };
 
 /**
@@ -117,16 +123,18 @@ exports.request = function (req, res, id, vectorClock) {
  */
 exports.release = function (req, res, id, vectorClock) {
     console.log(id + " received release message!");
-    if (queue.empty()) {
+    if (queue.length > 0) {
+        let pK = queue.pop();
+        console.log("Sending request return to: " + id + " after release message!");
+        sendPost(3000 + parseInt(pK), "/ms/requestReturn", id, vectorClock);
+        voted = true;
+    }
+    else {
         voted = false;
         console.log("Empty queue, setting voted to false");
     }
-    else {
-        let pK = queue.pop();
-        console.log("Sending request return to: " + id + " after release message!");
-        sendPost(pk, "/ms/requestReturn", id, vectorClock);
-        voted = true;
-    }
+    notifyClientSide();
+    res.end();
 };
 
 /**
@@ -166,7 +174,34 @@ function sendPost(port, type, id, vectorClock) {
     request.end();
 }
 
-exports.setup = function(ownVotingSet, ownId){
+/**
+ * Notifies the client side about the changes.
+ */
+function notifyClientSide(){
+    if (socket) {
+        socket.emit("FromAPI", {
+            state: state,
+            voted: voted,
+            repliesReceived: repliesReceived,
+            queue: queue,
+            votingSet: votingSet
+        });
+    }
+}
+
+exports.setup = function(ownVotingSet, ownId, io){
     id = ownVotingSet;
     votingSet = ownId;
+
+    io.on('connection', (client) => {
+        socket = client;
+        console.log('a user connected');
+        client.emit("FromAPI", {
+            state: state,
+            voted: voted,
+            repliesReceived: repliesReceived,
+            queue: queue,
+            votingSet: votingSet
+        });
+    });
 };

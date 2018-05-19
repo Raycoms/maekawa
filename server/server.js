@@ -1,19 +1,27 @@
-let express = require('express');
-let app = express();
-let port = process.env.PORT || 3000;
-let bodyParser = require('body-parser');
-let routes = require('./api/routes/routes');
+const express = require('express');
+const app = express();
+const port = process.env.PORT || 3000;
+const bodyParser = require('body-parser');
+const routes = require('./api/routes/routes');
+const io = require('socket.io')();
+const axios = require("axios");
+const http = require('http');
 
 //Unique Id of the server.
 let id = port - 3000;
 //Vector clock taking care of the order of the events.
 let vectorClock = [0, 0, 0];
 
+const server = http.createServer(app);
+
 console.log('RESTful API server ' + id + ' started on: ' + port);
 console.log(vectorClock);
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
+
+console.log("Listening on: " + (parseInt(port) + 2000));
+io.listen(parseInt(port) + 2000);
 
 //Middleware to increase clock on each get event.
 app.get('/*', function (req, res, next) {
@@ -28,8 +36,9 @@ app.post('/*', function (req, res, next) {
     next();
 });
 
+
 //register the route
-routes(app, id, vectorClock, process.env.PPORT);
+routes(app, id, vectorClock, process.env.PPORT, io);
 app.listen(port);
 
 
@@ -47,10 +56,12 @@ function updateVectorClock(vectorClock, req) {
     vectorClock[id] += 1;
     console.log('Incoming post from: ' + req.body.id);
     incomingClock = req.body.vector;
-    for (i = 0; i < incomingClock.length; i++) {
-        entry = incomingClock[i];
-        if (entry > vectorClock[i]) {
-            vectorClock[i] = parseInt(entry);
+    if (incomingClock) {
+        for (i = 0; i < incomingClock.length; i++) {
+            entry = incomingClock[i];
+            if (entry > vectorClock[i]) {
+                vectorClock[i] = parseInt(entry);
+            }
         }
     }
     console.log(vectorClock);
