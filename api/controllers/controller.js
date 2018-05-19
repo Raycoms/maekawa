@@ -59,7 +59,7 @@ exports.clientRelease = function (req, res, id, vectorClock) {
     console.log(id + " client releasing mutual exclusion!");
     state = "RELEASED";
     votingSet.forEach(function (port) {
-        console.log("Sending request to: " + port);
+        console.log("Sending release message to: " + port);
         sendPost(port, "/ms/release", id, vectorClock);
     });
 };
@@ -77,6 +77,7 @@ exports.requestReturn = function (req, res, id, vectorClock) {
     if (repliesReceived >= votingSet.length) {
         repliesReceived = 0;
         state = "HELD";
+        console.log("Holding now!")
     }
 };
 
@@ -92,15 +93,18 @@ exports.request = function (req, res, id, vectorClock) {
     let i = req.body.id;
     if (state !== "HELD" && !voted) {
         if (state === "RELEASED" || (state === "WANTED" && vectorClock[i] < vectorClock[id])) {
+            console.log("Sending vote to " + i);
             sendPost(i, "/ms/requestReturn", id, vectorClock);
             voted = true;
         }
         else {
+            console.log("Added " + i + " to queue");
             queue.push(i);
         }
     }
     else {
         queue.push(i);
+        console.log("Added " + i + " to queue");
     }
 };
 
@@ -115,9 +119,11 @@ exports.release = function (req, res, id, vectorClock) {
     console.log(id + " received release message!");
     if (queue.empty()) {
         voted = false;
+        console.log("Empty queue, setting voted to false");
     }
     else {
         let pK = queue.pop();
+        console.log("Sending request return to: " + id + " after release message!");
         sendPost(pk, "/ms/requestReturn", id, vectorClock);
         voted = true;
     }
