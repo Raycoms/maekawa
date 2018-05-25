@@ -38,12 +38,14 @@ exports.post = function (req, res) {
  */
 exports.clientRequest = function (req, res, id, vectorClock) {
     console.log(id + " client requesting mutual exclusion!");
-    state = "WANTED";
-    votingSet.forEach(function (port) {
-        console.log("Sending request to: " + port);
-        sendPost(port, "/ms/request", id, vectorClock);
-        notifyClientSide();
-    });
+    if (state === "RELEASED") {
+        state = "WANTED";
+        votingSet.forEach(function (port) {
+            console.log("Sending request to: " + port);
+            sendPost(port, "/ms/request", id, vectorClock);
+            notifyClientSide();
+        });
+    }
     res.end();
 };
 
@@ -56,13 +58,15 @@ exports.clientRequest = function (req, res, id, vectorClock) {
  * @param vectorClock the vector block of this server.
  */
 exports.clientRelease = function (req, res, id, vectorClock) {
-    console.log(id + " client releasing mutual exclusion!");
-    state = "RELEASED";
-    votingSet.forEach(function (port) {
-        console.log("Sending release message to: " + port);
-        sendPost(port, "/ms/release", id, vectorClock);
-        notifyClientSide();
-    });
+    //console.log(id + " client releasing mutual exclusion!");
+    if (state === "HELD") {
+        state = "RELEASED";
+        votingSet.forEach(function (port) {
+            console.log("Leaving MUTEX");
+            sendPost(port, "/ms/release", id, vectorClock);
+            notifyClientSide();
+        });
+    }
     res.end();
 };
 
@@ -74,11 +78,11 @@ exports.clientRelease = function (req, res, id, vectorClock) {
  */
 exports.requestReturn = function (req, res, id) {
     repliesReceived++;
-    console.log(id + " received answer #" + repliesReceived + " of server regarding mutual exclusion!");
+    //console.log(id + " received answer #" + repliesReceived + " of server regarding mutual exclusion!");
     if (repliesReceived >= votingSet.length) {
         repliesReceived = 0;
         state = "HELD";
-        console.log("Holding now!")
+        console.log("Entering MUTEX!")
     }
     notifyClientSide();
     res.end();
@@ -93,22 +97,22 @@ exports.requestReturn = function (req, res, id) {
  */
 exports.request = function (req, res, id, vectorClock) {
     let i = req.body.id;
-    console.log(id + " received request of other server " + i + " for mutual exclusion! State: " + state + " voted: " + voted);
+    //console.log(id + " received request of other server " + i + " for mutual exclusion! State: " + state + " voted: " + voted);
 
     if (state !== "HELD" && !voted) {
         if (state === "RELEASED" || (state === "WANTED" && (vectorClock[i] < vectorClock[id] || (vectorClock[i] === vectorClock[id] && i < id) || parseInt(i) === parseInt(id)))) {
-            console.log("Sending vote to " + i);
+            //console.log("Sending vote to " + i);
             sendPost(3000 + parseInt(i), "/ms/requestReturn", id, vectorClock);
             voted = true;
         }
         else {
             queue.push(i);
-            console.log("Added " + i + " to queue");
+            //console.log("Added " + i + " to queue");
         }
     }
     else {
         queue.push(i);
-        console.log("Added " + i + " to queue is holding or voted already!");
+        //console.log("Added " + i + " to queue is holding or voted already!");
     }
     notifyClientSide();
     res.end();
@@ -122,16 +126,16 @@ exports.request = function (req, res, id, vectorClock) {
  * @param vectorClock the vector block of this server.
  */
 exports.release = function (req, res, id, vectorClock) {
-    console.log(id + " received release message!");
+    //console.log(id + " received release message!");
     if (queue.length > 0) {
         let pK = queue.pop();
-        console.log("Sending request return to: " + id + " after release message!");
+        //console.log("Sending request return to: " + id + " after release message!");
         sendPost(3000 + parseInt(pK), "/ms/requestReturn", id, vectorClock);
         voted = true;
     }
     else {
         voted = false;
-        console.log("Empty queue, setting voted to false");
+        //console.log("Empty queue, setting voted to false");
     }
     notifyClientSide();
     res.end();

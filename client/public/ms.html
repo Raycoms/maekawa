@@ -1,0 +1,20 @@
+<html>
+<head>
+    <title>Mutual Exclusion!</title>
+</head>
+<body>
+<div id="released" style="margin:100px;">
+    <form action="/client/request" method="GET">
+        <input type="submit" value="Release Resource"/>
+    </form>
+</div>
+<div id="held" style="margin:100px;" hidden>
+    <form action="/client/release" method="GET">
+        <input type="submit" value="Release Resource"/>
+    </form>
+</div>
+<div id="waiting" style="margin:100px;" hidden>
+    Requesting Mutual Exclusion...
+</div>
+</body>
+</html>

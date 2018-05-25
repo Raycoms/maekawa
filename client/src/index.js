@@ -7,6 +7,33 @@ let querystring = require('querystring');
 
 class Board extends React.Component {
 
+
+    /**
+     * Function to release the mutex.
+     * @param id the id of this server.
+     */
+    release = (id) => {
+        console.log("Releasing!");
+        this.sendPost('/client/release', id);
+
+        setTimeout(function() { //Start the timer
+            this.request(id);
+        }.bind(this), Math.floor(Math.random() * 10000))
+    };
+
+    /**
+     * Function to request the mutex.
+     * @param id the id of this server.
+     */
+    request = (id) => {
+        console.log("Requesting!");
+        this.sendPost('/client/request', id);
+
+        setTimeout(function() { //Start the timer
+            this.release(id);
+        }.bind(this), Math.floor(Math.random() * 10000))
+    };
+
     /**
      * Function to send a post request to a server.
      * @param type the type of the message.
@@ -49,7 +76,7 @@ class Board extends React.Component {
             return (
                 <div>
                     <div id="released">
-                        <button onClick={this.sendPost.bind(this, '/client/request', id)}>Request Resource </button>
+                        <button onClick={this.request.bind(this, id)}>Request Resource </button>
                     </div>
                 </div>
             );
@@ -68,7 +95,7 @@ class Board extends React.Component {
             return (
                 <div>
                     <div id="held">
-                        <button onClick={this.sendPost.bind(this, '/client/release', id)}>Release Resource </button>
+                        <button onClick={this.release.bind(this, id)}>Release Resource </button>
                     </div>
                 </div>
             );
@@ -91,7 +118,9 @@ class Interface extends React.Component {
             //Amount of replies received.
             repliesReceived: 0,
             //Queue of requests.
-            queue: []
+            queue: [],
+            //
+            request_id: 0
         }
     }
 

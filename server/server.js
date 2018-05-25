@@ -54,7 +54,7 @@ app.use(function (req, res) {
  */
 function updateVectorClock(vectorClock, req) {
     vectorClock[id] += 1;
-    console.log('Incoming post from: ' + req.body.id);
+    //console.log('Incoming post from: ' + req.body.id);
     incomingClock = req.body.vector;
     if (incomingClock) {
         for (i = 0; i < incomingClock.length; i++) {
@@ -64,5 +64,5 @@ function updateVectorClock(vectorClock, req) {
             }
         }
     }
-    console.log(vectorClock);
+    //console.log(vectorClock);
 }
