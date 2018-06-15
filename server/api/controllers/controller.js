@@ -61,8 +61,8 @@ exports.clientRelease = function (req, res, id, vectorClock) {
     //console.log(id + " client releasing mutual exclusion!");
     if (state === "HELD") {
         state = "RELEASED";
+        console.log("Leaving MUTEX");
         votingSet.forEach(function (port) {
-            console.log("Leaving MUTEX");
             sendPost(port, "/ms/release", id, vectorClock);
             notifyClientSide();
         });
@@ -103,7 +103,9 @@ exports.request = function (req, res, id, vectorClock) {
         if (state === "RELEASED" || (state === "WANTED" && (vectorClock[i] < vectorClock[id] || (vectorClock[i] === vectorClock[id] && i < id) || parseInt(i) === parseInt(id)))) {
             //console.log("Sending vote to " + i);
             sendPost(3000 + parseInt(i), "/ms/requestReturn", id, vectorClock);
-            voted = true;
+            if (id !== i) {
+                voted = true;
+            }
         }
         else {
             queue.push(i);
